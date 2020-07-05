@@ -4,7 +4,7 @@ A simple daemon and web interface to manage `ffmpeg` processes to
 transcode `rtsp` to `rtmp` on affordable hardware (i.e. a raspberry
 pi). This is the successor to the `doccam-*` projects (where * =
 [pi](https://gitlab.com/vale9811/doccam-pi) |
-[server](https://gitlab.com/vale9811/doccam-server)) |
+[server](https://gitlab.com/vale9811/doccam-server) |
 [server-docker](https://gitlab.com/vale9811/doccam-server-docker)).
 
 The aim is to further simplify the software and rely largely on well

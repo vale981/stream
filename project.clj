@@ -6,6 +6,7 @@
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [com.github.thjomnx/java-systemd "1.1.0"]
                  [com.taoensso/timbre "4.10.0"]
+                 [cljstache/cljstache "2.0.6"]
                  [org.clojure/core.async "1.2.603"]]
   :main ^:skip-aot stream.core
   :target-path "target/%s"

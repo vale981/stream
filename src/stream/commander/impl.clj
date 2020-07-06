@@ -4,7 +4,9 @@
             [taoensso.timbre :as timbre
              :refer [log  trace  debug  info  warn  error  fatal  report
                      logf tracef debugf infof warnf errorf fatalf reportf
-                     spy get-env]])
+                     spy get-env]]
+            [clojure.java.shell :refer [sh]]
+            [slingshot.slingshot :refer [throw+]])
   (:import [de.thjom.java.systemd Systemd Manager Systemd$InstanceType UnitStateListener]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -88,7 +90,7 @@
   (. (get-service! name) stop "replace"))
 
 (defn get-service-status!
-  "Gets the ActiveState for the process of the name.
+  "Gets the ActiveState for the service of the name.
 
   Refer to
   [the systemd docs](https://www.freedesktop.org/wiki/Software/systemd/dbus/)
@@ -104,6 +106,30 @@
   for further information."
   [name]
   (keyword (. (get-service! name) getLoadState)))
+
+(defn get-service-file-state!
+  "Gets the UnitFileState for the process of the name.
+
+  Refer to
+  [the systemd docs](https://www.freedesktop.org/wiki/Software/systemd/dbus/)
+  for further information."
+  [name]
+  (keyword (. (get-service! name) getUnitFileState)))
+
+;; TODO: PR to implement in dbus lib.
+(defn enable-service!
+  "Enables the service with the name. Returns true on success."
+  [name]
+  (let [result (sh "systemctl" "--user" "enable" name)]
+    (if (= (:exit result) 0)
+      true
+      (throw+ {:type ::systemd-error :message "Service can't be enabled."
+               :name name :err (:err result)}))))
+
+(defn disable-service!
+  "Disables the service with the name."
+  [name]
+  (sh "systemctl" "--user" "disable" name))
 
 (defn create-service!
   "Creates a unit file and reloads systemd. See `create-unit-file`."

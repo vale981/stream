@@ -24,18 +24,26 @@
         unit-path (impl/create-unit-file! name
                                           "cat /dev/zero" "test service")]
     (testing "loading the service"
-      (is :not-found (impl/get-service-load-state! name))
       (impl/reload-systemd!)
-      (is :loaded (impl/get-service-load-state! name)))
+      (is (= :loaded (impl/get-service-load-state! name))))
 
     (testing "starting the service"
       (impl/start-service! name)
-      (is :active (impl/get-service-load-state! name)))
+      (is (= :active (impl/get-service-load-state! name))))
 
     (testing "stopping the service"
       (impl/stop-service! name)
-      (is :inactive (impl/get-service-load-state! name)))
+      (is (= :inactive (impl/get-service-load-state! name))))
+
+    (testing "enabling the service"
+      (impl/enable-service! name)
+      (println "==============>" (impl/get-service-file-state! name))
+      (is (= :enabled (impl/get-service-file-state! name))))
+
+    (testing "disable the service"
+      (impl/disable-service! name)
+      (is (= :disabled (impl/get-service-file-state! name))))
 
     (testing "removing the service"
       (impl/remove-service! name)
-      (is :not-found (impl/get-service-load-state! name)))))
+      (is (= :not-found (impl/get-service-load-state! name))))))

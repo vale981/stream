@@ -1,49 +1,48 @@
 (ns stream.commander-test
-  (:require [stream.commander.impl :as impl]
+  (:require [stream.commander.systemd :as systemd]
             [stream.commander.api :as api]
             [clojure.test :refer :all]
             [clojure.java.io :as io]))
 
 (deftest unit-files
   (testing "The rendering."
-    (is (#'impl/render-unit-file "test" "test" "test")))
+    (is (#'systemd/render-unit-file "test" "test" "test")))
 
   (let [name (str (java.util.UUID/randomUUID))]
     (testing "Writing a unit file."
       (let [file (io/as-file
-                  (impl/create-unit-file! name
+                  (systemd/create-unit-file! name
                                           "test" "test" "test"))]
         (is (.exists file))))
 
     (testing "Deleting a unit file"
-      (impl/remove-unit-file! name)
-      (is (not (.exists (io/as-file (impl/get-unit-path name))))))))
+      (systemd/remove-unit-file! name)
+      (is (not (.exists (io/as-file (systemd/get-unit-path name))))))))
 
 (deftest systemd-services
   (let [name (str (java.util.UUID/randomUUID))
-        unit-path (impl/create-unit-file! name
+        unit-path (systemd/create-unit-file! name
                                           "cat /dev/zero" "test service")]
     (testing "loading the service"
-      (impl/reload-systemd!)
-      (is (= :loaded (impl/get-service-load-state! name))))
+      (systemd/reload-systemd!)
+      (is (= :loaded (systemd/get-service-load-state! name))))
 
     (testing "starting the service"
-      (impl/start-service! name)
-      (is (= :active (impl/get-service-state! name))))
+      (systemd/start-service! name)
+      (is (= :active (systemd/get-service-state! name))))
 
     (testing "stopping the service"
-      (impl/stop-service! name)
-      (is (= :inactive (impl/get-service-state! name))))
+      (systemd/stop-service! name)
+      (is (= :inactive (systemd/get-service-state! name))))
 
     (testing "enabling the service"
-      (impl/enable-service! name)
-      (println "==============>" (impl/get-service-file-state! name))
-      (is (= :enabled (impl/get-service-file-state! name))))
+      (systemd/enable-service! name)
+      (is (= :enabled (systemd/get-service-file-state! name))))
 
     (testing "disable the service"
-      (impl/disable-service! name)
-      (is (= :disabled (impl/get-service-file-state! name))))
+      (systemd/disable-service! name)
+      (is (= :disabled (systemd/get-service-file-state! name))))
 
     (testing "removing the service"
-      (impl/remove-service! name)
-      (is (= :not-found (impl/get-service-load-state! name))))))
+      (systemd/remove-service! name)
+      (is (= :not-found (systemd/get-service-load-state! name))))))

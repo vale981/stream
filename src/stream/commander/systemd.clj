@@ -1,4 +1,4 @@
-(ns stream.commander.impl
+(ns stream.commander.systemd
   (:require [cljstache.core :as template]
             [clojure.java.io :as io]
             [taoensso.timbre :as timbre
@@ -159,8 +159,6 @@
   (stop-service! name)
   (remove-unit-file! name)
   (reload-systemd!))
-
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                         ;              Graveyard              ;

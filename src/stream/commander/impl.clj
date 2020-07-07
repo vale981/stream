@@ -7,7 +7,8 @@
                      spy get-env]]
             [clojure.java.shell :refer [sh]]
             [slingshot.slingshot :refer [throw+]])
-  (:import [de.thjom.java.systemd Systemd Manager Systemd$InstanceType UnitStateListener]))
+  (:import [de.thjom.java.systemd Systemd Manager Systemd$InstanceType
+            UnitStateListener]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                         ;          Systemd Instances          ;
@@ -66,6 +67,17 @@
 ;; For now these work with the service name. May be generalized to a
 ;; record some time.
 
+;; The control commands are implemented through shell calls, because
+;; the dbus library is broken and the performance is not important.
+;; The commands are implemented synchronousily.
+
+(defn- run-systemd-command! [& commands]
+  (let [result (apply sh "systemctl" "--user" "--job-mode=replace" commands)]
+    (if (= (:exit result) 0)
+      true
+      (throw+ {:type ::systemd-error
+               :name name :message (:err result)}))))
+
 (defn reload-systemd!
   "Reloads the systemd user instance."
   []
@@ -77,19 +89,19 @@
 (defn start-service!
   "Starts the userspace service with the name."
   [name]
-  (. (get-service! name) start "replace"))
+  (run-systemd-command! "start" name))
 
 (defn restart-service!
   "Restarts the userspace service with the name."
   [name]
-  (. (get-service! name) restart "replace"))
+  (run-systemd-command! "restart" name))
 
 (defn stop-service!
   "Stops the userspace service with the name."
   [name]
-  (. (get-service! name) stop "replace"))
+  (run-systemd-command! "stop" name))
 
-(defn get-service-status!
+(defn get-service-state!
   "Gets the ActiveState for the service of the name.
 
   Refer to
@@ -109,12 +121,16 @@
 
 (defn get-service-file-state!
   "Gets the UnitFileState for the process of the name.
+  Returns false if the service file isn't found.
 
   Refer to
   [the systemd docs](https://www.freedesktop.org/wiki/Software/systemd/dbus/)
   for further information."
   [name]
-  (keyword (. (get-service! name) getUnitFileState)))
+  (let [state (. (get-service! name) getUnitFileState)]
+    (if (> (count state) 0)
+      (keyword state)
+      false)))
 
 ;; TODO: PR to implement in dbus lib.
 (defn enable-service!
@@ -129,7 +145,7 @@
 (defn disable-service!
   "Disables the service with the name."
   [name]
-  (sh "systemctl" "--user" "disable" name))
+  (run-systemd-command! "disable" name))
 
 (defn create-service!
   "Creates a unit file and reloads systemd. See `create-unit-file`."
@@ -143,3 +159,13 @@
   (stop-service! name)
   (remove-unit-file! name)
   (reload-systemd!))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                                        ;              Graveyard              ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; (comment
+;;   (. manager addConsumer ManagerInterface$JobRemoved
+;;      (reify DBusSigHandler (handle [this sig] (println sig)))))

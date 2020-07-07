@@ -8,7 +8,9 @@
                  [com.taoensso/timbre "4.10.0"]
                  [cljstache/cljstache "2.0.6"]
                  [org.clojure/core.async "1.2.603"]
-                 [slingshot "0.12.2"]]
+                 [slingshot "0.12.2"]
+                 ;; [com.github.hypfvieh/dbus-java "3.2.1"]
+                 ]
   :main ^:skip-aot stream.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})

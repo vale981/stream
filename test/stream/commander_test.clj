@@ -29,11 +29,11 @@
 
     (testing "starting the service"
       (impl/start-service! name)
-      (is (= :active (impl/get-service-load-state! name))))
+      (is (= :active (impl/get-service-state! name))))
 
     (testing "stopping the service"
       (impl/stop-service! name)
-      (is (= :inactive (impl/get-service-load-state! name))))
+      (is (= :inactive (impl/get-service-state! name))))
 
     (testing "enabling the service"
       (impl/enable-service! name)

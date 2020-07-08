@@ -6,7 +6,11 @@
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
             [clojure.java.shell :refer [sh]]
-            [slingshot.slingshot :refer [throw+]])
+            [slingshot.slingshot :refer [throw+]]
+            [clojure.core.async
+             :as a
+             :refer [>! <! >!! <!! go chan buffer close! thread
+                     alts! alts!! timeout]])
   (:import [de.thjom.java.systemd Systemd Manager Systemd$InstanceType
             UnitStateListener]))
 
@@ -76,7 +80,8 @@
     (if (= (:exit result) 0)
       true
       (throw+ {:type ::systemd-error
-               :name name :message (:err result)}))))
+               :detail-type ::command-error
+               :message (:err result)}))))
 
 (defn reload-systemd!
   "Reloads the systemd user instance."
@@ -136,11 +141,7 @@
 (defn enable-service!
   "Enables the service with the name. Returns true on success."
   [name]
-  (let [result (sh "systemctl" "--user" "enable" name)]
-    (if (= (:exit result) 0)
-      true
-      (throw+ {:type ::systemd-error :message "Service can't be enabled."
-               :name name :err (:err result)}))))
+  (run-systemd-command! "enable" name))
 
 (defn disable-service!
   "Disables the service with the name."
@@ -149,9 +150,15 @@
 
 (defn create-service!
   "Creates a unit file and reloads systemd. See `create-unit-file`."
-  [name command description target]
-  (create-unit-file! name command description target)
-  (reload-systemd!))
+  ([name command description]
+   (create-service! name command description "default.target"))
+  ([name command description target]
+   (if (re-find #"[0-9]" (str (first name)))
+     (throw+ {:type ::systemd-error
+              :detail-type ::create-error
+              :message "Service name can't start with a digit."}))
+   (create-unit-file! name command description target)
+   (reload-systemd!)))
 
 (defn remove-service!
   "Stops the service, removes the unit file and reloads systemd."
@@ -159,6 +166,32 @@
   (stop-service! name)
   (remove-unit-file! name)
   (reload-systemd!))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                                        ;          Process Management         ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- DBusMap->map [map]
+  (reduce (fn [result [key value]]
+            (assoc result (keyword key) (. value getValue)))
+          {} map))
+
+;; TODO: implement removal
+(defn create-monitor!
+  "Creates a monitoring channel for the service with the name.
+  Returns a vector with the channel and a function to close it."
+  [name]
+  (debug "Creating monitor for service:" name)
+  (let [chan (chan)
+        listener
+        (reify
+          UnitStateListener
+          (stateChanged [this unit properties]
+            (>!! chan (DBusMap->map properties))))]
+    (. (get-service! name) addListener listener)
+    [chan (fn []
+            (close! chan)
+            (. (get-service! name) removeListener listener))]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                         ;              Graveyard              ;

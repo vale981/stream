@@ -1,4 +1,4 @@
-(defproject stream "0.1.0-SNAPSHOT"
+(defproject stream "0.1.1-SNAPSHOT"
   :description "the Simple Transmission Emitter And Monitor"
   :url "https://github.com/vale981/stream"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"

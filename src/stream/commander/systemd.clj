@@ -164,6 +164,7 @@
   "Stops the service, removes the unit file and reloads systemd."
   [name]
   (stop-service! name)
+  (disable-service! name)
   (remove-unit-file! name)
   (reload-systemd!))
 

@@ -5,4 +5,5 @@ script:
   - sudo apt install systemd dbus
   - sudo systemctl status dbus.service
   - sudo systemctl start dbus
+  - dbus launch
   - lein do test, uberjar

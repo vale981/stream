@@ -21,8 +21,8 @@
 ;; These are instanciated toplevel and are allowed to crash the
 ;; program if not successfull.
 
-(def ^:private systemd (. Systemd get Systemd$InstanceType/USER))
-(def ^:private manager (. systemd getManager))
+(def ^:private systemd (promise))
+(def ^:private manager (promise))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                         ;         Unit file Management        ;
@@ -86,10 +86,10 @@
 (defn reload-systemd!
   "Reloads the systemd user instance."
   []
-  (. manager reload))
+  (. @manager reload))
 
 (defn- get-service! [name]
-  (. manager getService name))
+  (. @manager getService name))
 
 (defn start-service!
   "Starts the userspace service with the name."
@@ -193,6 +193,18 @@
     [chan (fn []
             (close! chan)
             (. (get-service! name) removeListener listener))]))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                                        ;                 Init                ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn init!
+  "Initialize systemd manager etc..."
+  []
+  (info "starting systemd interface")
+  (deliver systemd (. Systemd get Systemd$InstanceType/USER))
+  (deliver manager (. @systemd getManager)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                         ;              Graveyard              ;

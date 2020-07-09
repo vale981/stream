@@ -1,11 +1,16 @@
 (ns stream.commander-test
   (:require [stream.commander.systemd :as systemd]
             [stream.commander.api :as api]
+            [stream.util.logging :as logging]
             [clojure.test :refer :all]
             [clojure.java.io :as io]
             [slingshot.slingshot :refer [try+]]
             [clojure.core.async
              :as a]))
+
+;; todo move to core
+(logging/init!)
+(systemd/init!)
 
 (deftest unit-files
   (testing "The rendering."
@@ -15,7 +20,7 @@
     (testing "Writing a unit file."
       (let [file (io/as-file
                   (systemd/create-unit-file! name
-                                          "test" "test" "test"))]
+                                             "test" "test" "test"))]
         (is (.exists file))))
 
     (testing "Deleting a unit file"

@@ -29,7 +29,9 @@
         (when-let [err ?err]
           (str enc/system-newline (stacktrace err opts))))))))
 
-(let [colors {:debug :cyan, :info :green, :warn :yellow, :error :red, :fatal :purple, :report :blue}]
-  (merge-config!
-   {:level :debug
-    :output-fn color-output-fn}))
+(defn init! []
+  "Initialize logging."
+  (let [colors {:debug :cyan, :info :green, :warn :yellow, :error :red, :fatal :purple, :report :blue}]
+    (merge-config!
+     {:level :debug
+      :output-fn color-output-fn})))

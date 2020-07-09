@@ -3,4 +3,4 @@ lein: 2.9.3
 script:
   - sudo apt update
   - sudo apt install systemd
-  - lein do test uberjar
+  - lein do test, uberjar

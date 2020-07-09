@@ -1,6 +1,7 @@
 (ns stream.commander-test
   (:require [stream.commander.systemd :as systemd]
             [stream.commander.api :as api]
+            [stream.core :as core]
             [stream.util.logging :as logging]
             [clojure.test :refer :all]
             [clojure.java.io :as io]
@@ -8,9 +9,7 @@
             [clojure.core.async
              :as a]))
 
-;; todo move to core
-(logging/init!)
-(systemd/init!)
+(core/init!)
 
 (deftest unit-files
   (testing "The rendering."

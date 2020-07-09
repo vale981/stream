@@ -100,7 +100,6 @@
     (let [{:keys [unit-name monitor]} proc
           [_ close] monitor]
       (sys/remove-service! unit-name)
-      (println close)
       (close)
       (dosync (commute processes dissoc id))
       true)

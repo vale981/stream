@@ -1,9 +1,5 @@
 language: clojure
 lein: 2.9.3
 script:
-  - sudo apt update
-  - sudo apt install systemd dbus
-  - sudo systemctl status dbus.service
-  - sudo systemctl start dbus
   - export $(dbus-launch)
   - lein do test, uberjar

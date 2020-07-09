@@ -1,4 +1,4 @@
 language: clojure
 lein: 2.9.3
 script:
-  - lein do deps, test, uberjar
+  - lein test, uberjar

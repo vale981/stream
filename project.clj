@@ -13,5 +13,6 @@
 
                  [com.taoensso/encore "2.122.0"]]
   :main ^:skip-aot stream.core
+  :plugins [[lein-cloverage "1.1.2"]]
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})

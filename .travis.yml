@@ -6,4 +6,5 @@ script:
   - sudo apt install dbus-user-session
   - systemctl --user start dbus
   - export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus
-  - lein do test, uberjar
+  - lein cloverage --coveralls
+  - lein uberjar

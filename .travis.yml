@@ -1,6 +1,8 @@
 language: clojure
 lein: 2.9.3
 script:
-  - export $(dbus-launch)
-  - systemctl --user daemon-reload
+  - sudo apt update
+  - sudo apt install dbus-user-session
+  - systemctl --user start dbus
+  - export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus
   - lein do test, uberjar

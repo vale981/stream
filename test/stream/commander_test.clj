@@ -29,7 +29,7 @@
 (deftest systemd-services
   (let [name (str "testing-" (java.util.UUID/randomUUID))
         unit-path (systemd/create-unit-file! name
-                                             "cat /dev/zero" "test service")]
+                                             "/bin/cat /dev/zero" "test service")]
     (testing "loading the service"
       (systemd/reload-systemd!)
       (is (= :loaded (systemd/get-service-load-state! name))))
@@ -60,7 +60,7 @@
       (is (= :not-found (systemd/get-service-load-state! name))))
 
     (testing "creating a service automatically"
-      (systemd/create-service! name "cat /dev/zero" "test service")
+      (systemd/create-service! name "/bin/cat /dev/zero" "test service")
       (is (= :loaded (systemd/get-service-load-state! name))))
 
     (let [[channel close] (systemd/create-monitor! name)]
@@ -83,7 +83,7 @@
 
     (testing "creating service with digit as first char"
       (try+
-       (systemd/create-service! "1234" "cat /dev/zero" "test service")
+       (systemd/create-service! "1234" "/bin/cat /dev/zero" "test service")
        (catch [:type :stream.commander.systemd/systemd-error] _
          (is true))
        (catch Object _

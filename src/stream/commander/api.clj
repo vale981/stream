@@ -33,7 +33,7 @@
 
 ;; TODO: load from config
 (def default-ffmpeg-config
-  {:ffmpeg-path "usr/bin/ffmpeg" :rtsp-transport "tcp" :custom-flags ""
+  {:ffmpeg-path "/usr/bin/ffmpeg" :rtsp-transport "tcp" :custom-flags ""
    :audio-bitrate "128k" :audio-channels 1 :audio-sampling-rate 44100
    :rtsp-user nil :rtsp-password nil :buffer-size "100M"})
 

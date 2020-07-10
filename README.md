@@ -1,5 +1,6 @@
 # stream - the Simple Transmission Emitter And Monitor
 [![Build Status](https://travis-ci.org/vale981/stream.svg?branch=master)](https://travis-ci.org/vale981/stream)
+[![Coverage Status](https://coveralls.io/repos/github/vale981/stream/badge.svg?branch=master)](https://coveralls.io/github/vale981/stream?branch=master)
 
 A simple daemon and web interface to manage `ffmpeg` processes to
 transcode `rtsp` to `rtmp` on affordable hardware (i.e. a raspberry

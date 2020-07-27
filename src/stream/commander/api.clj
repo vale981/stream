@@ -1,5 +1,6 @@
 (ns stream.commander.api
   (:require [stream.commander.systemd :as sys]
+            [stream.commander.journal :as journal]
             [clojure.string :as string]
             [taoensso.timbre :as timbre
              :refer [log  trace  debug  info  warn  error  fatal  report
@@ -24,6 +25,7 @@
 (def ^:private processes (ref {}))
 
 (defn- generate-process-id
+  "Generates a guaranteed unique ID for the process."
   []
   (loop []
     (let [id (str (java.util.UUID/randomUUID))]

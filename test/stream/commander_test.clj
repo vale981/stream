@@ -1,5 +1,6 @@
 (ns stream.commander-test
   (:require [stream.commander.systemd :as systemd]
+            [stream.commander.journal :as journal]
             [stream.commander.api :as api]
             [stream.core :as core]
             [stream.util.logging :as logging]
@@ -26,10 +27,25 @@
       (systemd/remove-unit-file! name)
       (is (not (.exists (io/as-file (systemd/get-unit-path name))))))))
 
+(deftest journal-utilities
+  (testing "map to flags"
+    (is (= (#'journal/map->flags {:t 1 :u 2})
+           ["-t1" "-u2"]))
+    (is (= (#'journal/map->flags {:t 1 :u 2 :test 11})
+           ["-t1" "-u2" "--test=11"]))))
+
+(def script
+  (str "/bin/bash -c \""
+       "echo test; "
+       ">&2 echo error;"
+       "cat /dev/null"
+       "\""))
+
 (deftest systemd-services
   (let [name (str "testing-" (java.util.UUID/randomUUID))
-        unit-path (systemd/create-unit-file! name
-                                             "/bin/cat /dev/zero" "test service")]
+        unit-path
+        (systemd/create-unit-file! name
+                                   script "test service")]
     (testing "loading the service"
       (systemd/reload-systemd!)
       (is (= :loaded (systemd/get-service-load-state! name))))
@@ -37,6 +53,11 @@
     (testing "starting the service"
       (systemd/start-service! name)
       (is (= :active (systemd/get-service-state! name))))
+
+    (testing "reading the logs"
+      (let [logs (journal/read-logs! name)]
+        (is (= (:message (second logs)) "test"))
+        (is (= (:message (nth logs 2)) "error"))))
 
     (testing "stopping the service"
       (systemd/stop-service! name)
@@ -60,7 +81,7 @@
       (is (= :not-found (systemd/get-service-load-state! name))))
 
     (testing "creating a service automatically"
-      (systemd/create-service! name "/bin/cat /dev/zero" "test service")
+      (systemd/create-service! name script "test service")
       (is (= :loaded (systemd/get-service-load-state! name))))
 
     (let [[channel close] (systemd/create-monitor! name)]
@@ -83,7 +104,7 @@
 
     (testing "creating service with digit as first char"
       (try+
-       (systemd/create-service! "1234" "/bin/cat /dev/zero" "test service")
+       (systemd/create-service! "1234" script "test service")
        (catch [:type :stream.commander.systemd/systemd-error] _
          (is true))
        (catch Object _

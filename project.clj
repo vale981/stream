@@ -10,7 +10,7 @@
                  [org.clojure/core.async "1.2.603"]
                  [slingshot "0.12.2"]
                  ;; [com.github.hypfvieh/dbus-java "3.2.1"]
-
+                 [org.clojure/data.json "1.0.0"]
                  [com.taoensso/encore "2.122.0"]]
   :main ^:skip-aot stream.core
   :plugins [[lein-cloverage "1.1.2"]]

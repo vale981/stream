@@ -90,8 +90,6 @@
         (trace "Dbus Event" id parsed)
         (put-process-event! id parsed)
         (reduce (fn [queue element]
-                  (println (:event parsed) (:wait-for element))
-
                   (if (= (:event parsed) (:wait-for element))
                     (do
                       (trace id
@@ -141,8 +139,6 @@
       (trace "Monitoring" id)
       (go (a/into [] monitor))        ; flush the channel
       (loop [queue []]
-        (println queue)
-
         (let [[event channel]
               (alts!! (conj (map :timeout queue) monitor control))]
           (condp = channel

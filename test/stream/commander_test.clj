@@ -84,7 +84,7 @@
       (systemd/create-service! name script "test service")
       (is (= :loaded (systemd/get-service-load-state! name))))
 
-    (let [[channel close] (systemd/create-monitor! name)]
+    (let [[channel close] (systemd/create-monitor! name "0")]
       (testing "detecting activity"
         (systemd/restart-service! name)
         (is (a/<!! channel) "No value in channel!")

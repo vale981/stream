@@ -4,6 +4,7 @@
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
             [clojure.java.shell :refer [sh]]
+            [clojure.set :refer [map-invert]]
             [clojure.data.json :as json]
             [slingshot.slingshot :refer [throw+]]
             [clojure.core.async
@@ -26,6 +27,9 @@
           "6" :info,
           "7" :debug})
 
+(def ^:private level-strings
+  (map-invert levels))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                         ;           Journal Commands          ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -33,13 +37,19 @@
 (defn- map->flags
   "Converts a hashmap {:a 1 :b 2} to command line flags."
   [map]
-  (reduce (fn [options [flag value]]
-            (conj options
-                  (let [name (name flag)]
-                    (if (> (count name) 1)
-                      (str "--" name "=" value)
-                      (str "-" name value)))))
-          [] map))
+  (let [flags (reduce (fn [options [flag value]]
+                        (if (and value (not (= flag :verbatim)))
+                          (conj options
+                                (let [name (name flag)]
+                                  (if (> (count name) 1)
+                                    (str "--" name "=" value)
+                                    (str "-" name value))))
+                          options))
+                      [] map)
+        verb (:verbatim map)]
+    (if verb
+      (conj flags verb)
+      flags)))
 
 (defn- run-journalctl-command!
   "Boilerplate to run a journalctl command over the shell.
@@ -47,21 +57,26 @@
    This need not be performant."
   [& {:as options}]
   (let [result
-        (apply sh "journalctl" "--user" "-ojson" (map->flags options))]
+        (apply sh "journalctl" "-a" "--user" "-ojson" (map->flags options))]
     (if (= (:exit result) 0)
-      (map #(json/read-str % :key-fn (comp keyword str/lower-case))
-           (str/split-lines (:out result)))
+      (if (> (count (:out result)) 0)
+        (map #(json/read-str % :key-fn (comp keyword str/lower-case))
+             (str/split-lines (:out result)))
+        [])
       (throw+ {:type ::journalctl-error
-               :detail-type ::command-error
+               :detail-type ::log-read-error
                :message (:err result)}))))
 
-(defn read-logs!
+(defn get-logs!
   "Reads the logs from a systemd user unit specified by its name: `unit`.
 
-   :number
-       How many of the latest log entries to read."
-  [unit & {:keys [number] :or {number 10}}]
-  (let [logs (run-journalctl-command! :u unit :n number)]
+  :number
+      How many of the latest log entries to read.
+      Defaults to 10."
+  [unit & {:keys [number priority executable] :or {number 10 executable false}}]
+  (let [logs (run-journalctl-command!
+              :u unit :p (get level-strings priority)
+              :n number :verbatim executable)]
     (map
      (fn [entry]
        {:level (get levels (:priority entry))

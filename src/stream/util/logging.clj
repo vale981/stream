@@ -22,7 +22,7 @@
         (color-str color level-str)
         level-str)
       ": "
-      (color-str :black (force msg_))
+      (force msg_)
       (if (= level :debug)
         (str " - [" (or ?ns-str ?file "?") ":" (or ?line "?") "]"))
       (when-not no-stacktrace?
@@ -33,5 +33,5 @@
   "Initialize logging."
   (let [colors {:debug :cyan, :info :green, :warn :yellow, :error :red, :fatal :purple, :report :blue}]
     (merge-config!
-     {:level :debug
+     {:level :trace
       :output-fn color-output-fn})))

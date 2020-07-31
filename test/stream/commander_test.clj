@@ -55,7 +55,7 @@
       (is (= :active (systemd/get-service-state! name))))
 
     (testing "reading the logs"
-      (let [logs (journal/read-logs! name)]
+      (let [logs (journal/get-logs! name)]
         (is (= (:message (second logs)) "test"))
         (is (= (:message (nth logs 2)) "error"))))
 
@@ -84,7 +84,7 @@
       (systemd/create-service! name script "test service")
       (is (= :loaded (systemd/get-service-load-state! name))))
 
-    (let [[channel close] (systemd/create-monitor! name "0")]
+    (let [[channel close] (systemd/create-monitor! name)]
       (testing "detecting activity"
         (systemd/restart-service! name)
         (is (a/<!! channel) "No value in channel!")

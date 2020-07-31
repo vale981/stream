@@ -137,7 +137,6 @@
       (keyword state)
       false)))
 
-;; TODO: PR to implement in dbus lib.
 (defn enable-service!
   "Enables the service with the name. Returns true on success."
   [name]
@@ -188,7 +187,8 @@
         (reify
           UnitStateListener
           (stateChanged [this unit properties]
-            (>!! chan (DBusMap->map properties))))]
+            (a/put! chan {:data (DBusMap->map properties)
+                          :type :dbus})))]
     (. (get-service! name) addListener listener)
     [chan (fn []
             (close! chan)

@@ -2,7 +2,6 @@
   (:require [stream.commander.systemd :as sys]
             [stream.commander.journal :as journal]
             [clojure.string :as string]
-            [clojure.core.match :refer [match]]
             [taoensso.timbre :as timbre
              :refer [log  trace  debug  info  warn  error  fatal  report
                      logf tracef debugf infof warnf errorf fatalf reportf
@@ -238,12 +237,12 @@
   [proc proc-var & body]
   `(if-let [~proc-var
             (cond
-              (string? proc)
+              (string? ~proc)
               (get-process! ~proc)
 
-              (instance? process proc)
-              proc
-              :default proc)]
+              (instance? process ~proc)
+              ~proc
+              :default ~proc)]
      (do ~@body)
      false))
 
@@ -258,7 +257,7 @@
       (close! (:supervisor proc))
       (sys/remove-service! unit-name)
       (close)
-      (dosync (commute processes dissoc (:id process)))
+      (dosync (commute processes dissoc (:id proc)))
       true)))
 
 (defn delete-all-processes! []

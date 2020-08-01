@@ -59,18 +59,20 @@
 
 (defn- parse-dbus-event
   "Parses a dbus state `update` into an event."
-  [update process]
+  [update id]
   (condp = (:ActiveState update)
     "failed" {:event :failed
               ;; we take the last message because the journal does not
               ;; distinct between message types from the executable
-              :error (:message
-                      (first
-                       (journal/get-logs!
-                        (:unit-name process)
-                        :number 1
-                        :executable (:ffmpeg-path (:ffmpeg-config process)))))}
-    "active" {:event :started}
+              :error
+              (let [process (get @processes id)]
+                (:message
+                 (first
+                  (journal/get-logs!
+                   (:unit-name process)
+                   :number 1
+                   :executable (:ffmpeg-path (:ffmpeg-config process))))))}
+    "active" {:event :active}
     (:event :unknown)))
 
 (defn- put-process-event!
@@ -86,7 +88,7 @@
          data :data} event]
     (condp = type
       :dbus
-      (let [parsed (parse-dbus-event data (get @processes id))]
+      (let [parsed (parse-dbus-event data id)]
         (trace "Dbus Event" id parsed)
         (put-process-event! id parsed)
         (reduce (fn [queue element]
@@ -100,7 +102,9 @@
       queue)))
 
 (defn- handle-control-event!
-  "Handles a control message in the supervisor thread."
+  "Handles a control message in the supervisor thread.
+
+  Unknown events are a noop."
   [event queue]
   (condp = (:command event)
     :wait-for
@@ -137,7 +141,6 @@
   (let [control (chan)]
     (thread
       (trace "Monitoring" id)
-      (go (a/into [] monitor))        ; flush the channel
       (loop [queue []]
         (let [[event channel]
               (alts!! (conj (map :timeout queue) monitor control))]
@@ -160,7 +163,10 @@
 (defn wait-for!
   "Installs a waiter in the supervisor thread for a process.
   Takes the `supervisor` channel, the `event` keyword and a `timeout` (in msec)
-  to wait for. Returns a promise."
+  to wait for. Returns a promise.
+
+  The promise resolves to `:timeout` in case of a timeout and to the
+  event data in case the event occurs."
   [supervisor event timeout]
   (let [prom (promise)]
     (a/put! supervisor
@@ -229,7 +235,11 @@
 
 ;; TODO: defmulti
 (defmacro with-process
-  "A wrapper to access a process either by id or by the process itself."
+  "A wrapper to access a process either by id or by the process itself.
+  `proc` can either be a process or a process-id. The process is bound
+  to `proc-var`.
+
+  Returns `false` if no process is found."
   [proc proc-var & body]
   `(if-let [~proc-var
             (cond

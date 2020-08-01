@@ -32,7 +32,21 @@
     (is (= (#'journal/map->flags {:t 1 :u 2})
            ["-t1" "-u2"]))
     (is (= (#'journal/map->flags {:t 1 :u 2 :test 11})
-           ["-t1" "-u2" "--test=11"]))))
+           ["-t1" "-u2" "--test=11"]))
+    (is (= (#'journal/map->flags {:t 1 :u 2 :test 11 :verbatim "hi"})
+           ["-t1" "-u2" "--test=11" "hi"]))))
+
+(deftest journal
+  (testing "returns empty seq if there are no logs"
+    (is (empty? (journal/get-logs! "nonexistent"))))
+  (testing "throws upon error in journalctl"
+    (try+
+     (#'journal/run-journalctl-command! :uuuu "bad")
+     (is false "No exception thrown.")
+     (catch [:type :stream.commander.journal/journalctl-error] _
+       (is true))
+     (catch Object _
+       (is false "Wrong exception thrown.")))))
 
 (def script
   (str "/bin/bash -c \""
@@ -90,7 +104,7 @@
         (is (a/<!! channel) "No value in channel!")
         (while (a/poll! channel))
         (close)
-        (is (= nil (a/<!! channel)))))
+        (is (not (a/put! channel "hi")))))
 
     (testing "failing systemd command"
       (systemd/remove-service! name)
@@ -126,7 +140,7 @@
     (is (= "a-b-c-d-" (#'api/sanitize-process-name "a*b C?d.")))))
 
 (deftest ffmpeg-process-management
-  (let [config {:cam-ip "localhost"
+  (let [config {:cam-ip "nonexistent"
                 :cam-rtsp-port "554"
                 :profile "bla"
                 :stream-server "server"
@@ -140,6 +154,64 @@
       (testing "creating ffmpeg process the high-level way"
         (is (= :loaded (systemd/get-service-load-state!
                         (:unit-name proc)))))
+
+      (testing "getting the newly created process state"
+        (is :loaded (api/get-process-state! proc)))
+
+      (testing "starting a process"
+        (is true (api/start-process! proc))
+        ;; now: the process ought to be **failed**
+        (is :failed (api/get-process-state! proc)))
+
+      (testing "waiting for the process to start"
+        (let  [prom (api/wait-for!
+                     (:supervisor proc) :active 100000)]
+          (api/start-process! proc)
+          (is (not (= :timeout @prom)))))
+
+      (testing "waiting for the process to fail"
+        (let  [prom (api/wait-for!
+                     (:supervisor proc) :failed 100000)]
+          (api/start-process! proc)
+          (is (not (= :timeout @prom)))))
+
+      (testing "spilling junk into the control channel"
+        (a/>!! (:supervisor proc) "junk"))
+
+      (testing "spilling junk into the monitor channel"
+        (a/>!! (first (:monitor proc)) "junk"))
+
+      (testing "waiting for a timeout"
+        (let  [prom (api/wait-for!
+                     (:supervisor proc) :one 100)
+               prom1 (api/wait-for!
+                      (:supervisor proc) :two 100)]
+          (is (= :timeout @prom))
+          (is (= :timeout @prom1))))
+      (testing "the with-process macro"
+        (api/with-process (:id proc) new-proc
+          (is (= proc new-proc)))
+        (is (not (api/with-process "none" new-proc
+                 true))))
+
+      (testing "stopping the process"
+        (api/stop-process! proc)
+        (is (not (api/process-running? proc))))
+
+      (testing "enabling the process"
+        (api/enable-process! proc)
+        (is (api/process-enabled? proc)))
+
+      (testing "the subscription to the master monitor"
+        (let [c (a/chan)]
+          (a/sub api/monitor :process-event c)
+          (api/start-process! proc)
+          (is (= (:id proc) (:id (a/<!! c))))
+          ;; clear it
+          (while (a/poll! c))
+          (#'api/put-process-event! "test" "test-data")
+          (is (= {:type :process-event
+                  :id "test" :data "test-data"} (a/<!! c)))))
 
       (testing "deleting the process"
         (is (api/delete-process! (:id proc)))

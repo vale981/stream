@@ -223,7 +223,7 @@
         monitor (sys/create-monitor! unit-name)
         supervisor (attach-supervisor! id (first monitor))
         process (->process id process-name unit-name monitor supervisor ffmpeg-config #{})]
-    (debug "Creating process with ID:" id)
+    (info "Creating process with ID:" id)
     (dosync
      (commute processes assoc id process))
     process))

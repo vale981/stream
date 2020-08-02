@@ -52,7 +52,7 @@
   (str "/bin/bash -c \""
        "echo test; "
        ">&2 echo error;"
-       "cat /dev/null"
+       "cat /dev/zero"
        "\""))
 
 (deftest systemd-services
@@ -66,6 +66,7 @@
 
     (testing "starting the service"
       (systemd/start-service! name)
+      (a/<!! (a/timeout 1000))
       (is (= :active (systemd/get-service-state! name))))
 
     (testing "reading the logs"

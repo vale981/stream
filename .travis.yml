@@ -3,7 +3,7 @@ dist: bionic
 lein: 2.9.3
 script:
   - sudo apt update
-  - sudo apt install dbus-user-session curl
+  - sudo apt install dbus-user-session curl ffmpeg
   - systemctl --user start dbus
   - export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus
   - lein cloverage --coveralls

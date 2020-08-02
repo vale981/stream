@@ -166,13 +166,25 @@
 
       (testing "waiting for the process to start"
         (let  [prom (api/wait-for!
-                     (:supervisor proc) :active 10000)]
+                     (:supervisor proc)
+                     :event :active :timeout 10000)]
           (api/start-process! proc)
           (is (not (= :timeout @prom)))))
 
       (testing "waiting for the process to fail"
         (let  [prom (api/wait-for!
-                     (:supervisor proc) :failed 10000)]
+                     (:supervisor proc)
+                     :event :failed
+                     :timeout 10000)]
+          (api/start-process! proc)
+          (is (not (= :timeout @prom)))))
+
+      (testing "waiting for the process to activate or fail"
+        (let  [prom (api/wait-for!
+                     (:supervisor proc)
+                     :matcher #(or (= (:event %1) :active)
+                                  (= (:event %1) :failed))
+                     :timeout 1000)]
           (api/start-process! proc)
           (is (not (= :timeout @prom)))))
 
@@ -184,9 +196,13 @@
 
       (testing "waiting for a timeout"
         (let  [prom (api/wait-for!
-                     (:supervisor proc) :one 100)
+                     (:supervisor proc)
+                     :event :one
+                     :timeout 100)
                prom1 (api/wait-for!
-                      (:supervisor proc) :two 100)]
+                      (:supervisor proc)
+                      :matcher #(and % false)
+                      :timeout 100)]
           (is (= :timeout @prom))
           (is (= :timeout @prom1))))
 
@@ -197,8 +213,12 @@
                  true))))
 
       (testing "stopping the process"
-        (api/stop-process! proc)
-        (is (not (api/process-running? proc))))
+        (let [prom (api/wait-for!
+                    (:supervisor proc)
+                    :event :inactive)]
+          (api/stop-process! proc)
+          (is (not (= :timeout @prom)))
+          (is (not (api/process-running? proc)))))
 
       (testing "enabling the process"
         (api/enable-process! proc)

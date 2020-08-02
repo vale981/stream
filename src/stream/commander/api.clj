@@ -2,6 +2,7 @@
   (:require [stream.commander.systemd :as sys]
             [stream.commander.journal :as journal]
             [clojure.string :as string]
+            [slingshot.slingshot :refer [throw+]]
             [taoensso.timbre :as timbre
              :refer [log  trace  debug  info  warn  error  fatal  report
                      logf tracef debugf infof warnf errorf fatalf reportf
@@ -95,7 +96,12 @@
         (do (trace "Dbus Event" id parsed)
             (put-process-event! id parsed)
             (reduce (fn [queue element]
-                      (if (= (:event parsed) (:wait-for element))
+                      (if (or (if-let [watch-for (:event element)]
+                               (= (:event parsed) watch-for)
+                               false)
+                             (if-let [matcher (:matcher element)]
+                               (matcher parsed)
+                               false))
                         (do
                           (trace id
                                  "Delivering event:" parsed)
@@ -115,7 +121,8 @@
     (do (trace "Waiting for" event)
         (conj queue
               {:timeout (timeout (:timeout event))
-               :wait-for (:event event)
+               :event (:event event)
+               :matcher (:matcher event)
                :promise (:promise event)}))
     queue))
 
@@ -166,15 +173,38 @@
 
 (defn wait-for!
   "Installs a waiter in the supervisor thread for a process.
-  Takes the `supervisor` channel, the `event` keyword and a `timeout` (in msec)
-  to wait for. Returns a promise.
+  Takes the `supervisor` and some keyword arguments described
+  below. Returns a promise.
 
   The promise resolves to `:timeout` in case of a timeout and to the
-  event data in case the event occurs."
-  [supervisor event timeout]
+  event data in case the event occurs.
+
+  :event
+  :  The event to wait for. For example `:active`
+
+  :matcher
+  :  A predicate that takes a parsed event returned
+     by [[parse-dbus-event]]. If that predicate returns true,
+     the promise will be fulfilled.
+
+  :timeout
+  :  Timeout in msec to wait. If the timeout is triggered, the
+     promise will be fulfilled with the value `:timeout`. Defaults to one
+     second.
+
+  Either `:event` or `:matcher` or both have to be given. `:event`
+  takes precedence.
+  "
+  [supervisor & {:keys [event timeout matcher]
+                 :or {timeout 1000}}]
   (let [prom (promise)]
-    (a/put! supervisor
-            {:command :wait-for :event event :promise prom :timeout timeout})
+    (if (and (not event) (not matcher))
+      (throw+ {:type ::commander-error
+               :detail-type ::create-watch-error
+               :message "Either event or matcher have to be specified!"})
+      (a/put! supervisor
+              {:command :wait-for :matcher matcher
+               :event event :promise prom :timeout timeout}))
     prom))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

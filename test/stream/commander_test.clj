@@ -84,7 +84,8 @@
     (testing "restarting the service"
       (systemd/start-service! name)
       (systemd/restart-service! name)
-      (while (= :activating (systemd/get-service-state! name))
+      (while (some #(= % (systemd/get-service-state! name))
+                   [:activating :deactivating])
         (a/<!! (a/timeout 1000)))
       (is (= :active (systemd/get-service-state! name))))
 

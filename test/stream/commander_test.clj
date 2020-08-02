@@ -220,8 +220,8 @@
       (testing "stopping the process"
         (let [prom (api/wait-for!
                     (:supervisor proc)
-                    :matcher (or (= (:event %1) :inactive)
-                                (= (:event %1) :failed)))]
+                    :matcher #(or (= (:event %1) :inactive)
+                                 (= (:event %1) :failed)))]
           (api/start-process! proc)
           (api/stop-process! proc)
           (is (not (= :timeout @prom)))

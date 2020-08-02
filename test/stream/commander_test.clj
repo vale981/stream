@@ -189,6 +189,7 @@
                       (:supervisor proc) :two 100)]
           (is (= :timeout @prom))
           (is (= :timeout @prom1))))
+
       (testing "the with-process macro"
         (api/with-process (:id proc) new-proc
           (is (= proc new-proc)))
@@ -207,12 +208,7 @@
         (let [c (a/chan)]
           (a/sub api/monitor :process-event c)
           (api/start-process! proc)
-          (is (= (:id proc) (:id (a/<!! c))))
-          ;; clear it
-          (while (a/poll! c))
-          (#'api/put-process-event! "test" "test-data")
-          (is (= {:type :process-event
-                  :id "test" :data "test-data"} (a/<!! c)))))
+          (is (= (:id proc) (:id (a/<!! c))))))
 
       (testing "deleting the process"
         (is (api/delete-process! (:id proc)))

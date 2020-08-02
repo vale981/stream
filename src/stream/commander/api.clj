@@ -60,6 +60,7 @@
 (defn- parse-dbus-event
   "Parses a dbus state `update` into an event."
   [update id]
+  (println (:ActiveState update))
   (condp = (:ActiveState update)
     "failed" {:event :failed
               ;; we take the last message because the journal does not
@@ -73,7 +74,10 @@
                    :number 1
                    :executable (:ffmpeg-path (:ffmpeg-config process))))))}
     "active" {:event :active}
-    (:event :unknown)))
+    "activating" {:event :activating}
+    "deactivating" {:event :deactivating}
+    "inactive" {:event :inactive}
+    nil))
 
 (defn- put-process-event!
   [id data]
@@ -88,17 +92,18 @@
          data :data} event]
     (condp = type
       :dbus
-      (let [parsed (parse-dbus-event data id)]
-        (trace "Dbus Event" id parsed)
-        (put-process-event! id parsed)
-        (reduce (fn [queue element]
-                  (if (= (:event parsed) (:wait-for element))
-                    (do
-                      (trace id
-                             "Delivering event:" parsed)
-                      (deliver (:promise element) parsed)
-                      queue)
-                    (conj queue element))) [] queue))
+      (if-let [parsed (parse-dbus-event data id)]
+        (do (trace "Dbus Event" id parsed)
+            (put-process-event! id parsed)
+            (reduce (fn [queue element]
+                      (if (= (:event parsed) (:wait-for element))
+                        (do
+                          (trace id
+                                 "Delivering event:" parsed)
+                          (deliver (:promise element) parsed)
+                          queue)
+                        (conj queue element))) [] queue))
+        queue)
       queue)))
 
 (defn- handle-control-event!

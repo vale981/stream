@@ -216,6 +216,7 @@
         (let [prom (api/wait-for!
                     (:supervisor proc)
                     :event :inactive)]
+          (api/start-process! proc)
           (api/stop-process! proc)
           (is (not (= :timeout @prom)))
           (is (not (api/process-running? proc)))))

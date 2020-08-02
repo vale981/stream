@@ -1,0 +1,49 @@
+# Maintainer: Valentin Boettcher <hiro@protagon.space>
+pkgname='stream'
+pkgver="0.1.1"
+pkgrel=1
+pkgdesc='A rtmp->rtmp transcoding monitor for ffmpeg. Written in clojure.'
+arch=('any')
+url='https://github.com/vale981/stream'
+license=('EPL')
+depends=('java-environment')
+makedepends=('clojure' 'leiningen' 'ffmpeg')
+source=('git+https://github.com/vale981/stream'
+       'stream.service')
+md5sums=('SKIP'
+         'fa413a06dbca8bf711a73cbaf2b61829')
+
+prepare() {
+  cd "$pkgname"
+  git checkout $(git describe --tags `git rev-list --tags --max-count=1`) \
+      -b latest
+}
+
+pkgver() {
+  cd "$pkgname"
+
+  clojure -e '(-> "project.clj" slurp read-string (nth 2))'
+}
+
+
+build() {
+  cd "$pkgname"
+
+  lein uberjar
+}
+
+check() {
+  cd "$pkgname"
+
+  lein test
+}
+
+package() {
+  cd "$pkgname"
+
+  install -d "$pkgdir/opt/$pkgname/"
+  install -D "target/uberjar/$pkgname-$pkgver-standalone.jar" "$pkgdir/opt/$pkgname/$pkgname.jar"
+  install -D "$srcdir/$pkgname.service" "$pkgdir/etc/systemd/system/$pkgname.service"
+}
+
+# vim:set ts=2 sw=2 et:

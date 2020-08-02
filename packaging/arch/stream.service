@@ -1,0 +1,12 @@
+[Unit]
+Description="STREAM - the Simple Transmission Emitter And Monitor"
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/java -jar /opt/stream/stream.jar
+Restart=on-failure
+SyslogIdentifier=stream
+
+[Install]
+WantedBy=multi-user.target

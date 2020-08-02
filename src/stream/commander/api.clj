@@ -60,7 +60,6 @@
 (defn- parse-dbus-event
   "Parses a dbus state `update` into an event."
   [update id]
-  (println (:ActiveState update))
   (condp = (:ActiveState update)
     "failed" {:event :failed
               ;; we take the last message because the journal does not

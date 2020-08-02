@@ -66,21 +66,26 @@
 
     (testing "starting the service"
       (systemd/start-service! name)
-      (a/<!! (a/timeout 1000))
+      (while (= :activating (systemd/get-service-state! name))
+        (a/<!! (a/timeout 1000)))
       (is (= :active (systemd/get-service-state! name))))
+
+    (testing "stopping the service"
+      (systemd/stop-service! name)
+      (while (= :deactivating (systemd/get-service-state! name))
+        (a/<!! (a/timeout 1000)))
+      (is (= :inactive (systemd/get-service-state! name))))
 
     (testing "reading the logs"
       (let [logs (journal/get-logs! name)]
         (is (= (:message (second logs)) "test"))
         (is (= (:message (nth logs 2)) "error"))))
 
-    (testing "stopping the service"
-      (systemd/stop-service! name)
-      (is (= :inactive (systemd/get-service-state! name))))
-
     (testing "restarting the service"
       (systemd/start-service! name)
       (systemd/restart-service! name)
+      (while (= :activating (systemd/get-service-state! name))
+        (a/<!! (a/timeout 1000)))
       (is (= :active (systemd/get-service-state! name))))
 
     (testing "enabling the service"
@@ -141,7 +146,7 @@
     (is (= "a-b-c-d-" (#'api/sanitize-process-name "a*b C?d.")))))
 
 (deftest ffmpeg-process-management
-  (let [config {:cam-ip "nonexistent"
+  (let [config {:cam-ip "0.0.0.0"
                 :cam-rtsp-port "554"
                 :profile "bla"
                 :stream-server "server"
@@ -175,7 +180,7 @@
         (let  [prom (api/wait-for!
                      (:supervisor proc)
                      :event :failed
-                     :timeout 10000)]
+                     :timeout 100000)]
           (api/start-process! proc)
           (is (not (= :timeout @prom)))))
 

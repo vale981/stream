@@ -76,8 +76,9 @@
 ;; The commands are implemented synchronousily.
 
 (defn- run-systemd-command! [& commands]
-  (let [result (apply sh "systemctl" "-q" "--job-mode=replace"
-                      "--user" "--job-mode=replace" commands)]
+  (let [result (apply sh "systemctl" "--no-block"
+                      "--job-mode=replace" "--user" "--job-mode=replace"
+                      commands)]
     (if (= (:exit result) 0)
       true
       (throw+ {:type ::systemd-error

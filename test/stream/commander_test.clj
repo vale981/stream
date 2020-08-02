@@ -166,13 +166,13 @@
 
       (testing "waiting for the process to start"
         (let  [prom (api/wait-for!
-                     (:supervisor proc) :active 100000)]
+                     (:supervisor proc) :active 10000)]
           (api/start-process! proc)
           (is (not (= :timeout @prom)))))
 
       (testing "waiting for the process to fail"
         (let  [prom (api/wait-for!
-                     (:supervisor proc) :failed 100000)]
+                     (:supervisor proc) :failed 10000)]
           (api/start-process! proc)
           (is (not (= :timeout @prom)))))
 

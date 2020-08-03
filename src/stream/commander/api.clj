@@ -65,6 +65,7 @@
   [update id]
   (condp = (:ActiveState update)
     "failed" {:event :failed
+              :reason (keyword (:SubState update))
               ;; we take the last message because the journal does not
               ;; distinct between message types from the executable
               :error
@@ -75,10 +76,10 @@
                    (:unit-name process)
                    :number 1
                    :executable (:ffmpeg-path (:ffmpeg-config process))))))}
-    "active" {:event :active}
-    "activating" {:event :activating}
-    "deactivating" {:event :deactivating}
-    "inactive" {:event :inactive}
+    "active" {:event :active :reason (keyword (:SubState update))}
+    "activating" {:event :activating :reason (keyword (:SubState update))}
+    "deactivating" {:event :deactivating :reason (keyword (:SubState update))}
+    "inactive" {:event :inactive :reason (keyword (:SubState update))}
     nil))
 
 (defn- put-process-event!
@@ -210,6 +211,11 @@
                :event event :promise prom :timeout timeout}))
     prom))
 
+(defn multi-event-matcher
+  "Matches any of the given events."
+  [& events]
+  #(some #{(:event %1)} [:inactive :failed]))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                         ;          Process Management         ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -294,21 +300,37 @@
   (sys/get-service-state! (:unit-name proc)))
 
 (defn start-process!
-  "Starts the service associated to the process `proc` (either id or
-  process object). Returns a promise that resolves to event `:failed`
-  or `:active` or times out after `timeout` ms."
+  "Starts the service associated to the process `proc`. Returns a
+  promise that resolves to event `:failed` or `:active` or times out
+  after `timeout` ms."
   ([proc timeout]
    (let [prom
-         (wait-for! proc :matcher #(some #{(:event %1)} [:active :failed]))]
+         (wait-for! proc :matcher (multi-event-matcher [:active :failed]))]
      (sys/start-service! (:unit-name proc))
      prom))
   ([proc]
    (start-process! proc +default-timeout+)))
 
 (defn stop-process!
-  "Stops the service associated to the process."
-  [proc]
-  (sys/stop-service! (:unit-name proc)))
+  "Stops the service associated to the process `proc`. Returns a promise
+  that resolves to event `:failed` or `:inactive` or times out after
+  `timeout` ms."
+  ([proc timeout]
+   (let [prom
+         (wait-for! proc :matcher (multi-event-matcher [:inactive :failed]))]
+     (sys/stop-service! (:unit-name proc))
+     prom))
+  ([proc]
+   (start-process! proc +default-timeout+)))
+
+(defn restart-process!
+  "Restarts a process `proc` and wait for stop and start to happen
+  within `timeout`."
+  ([proc timeout]
+   @(stop-process! proc timeout)
+   (start-process! proc timeout))
+  ([proc]
+   (restart-process! proc +default-timeout+)))
 
 (defn process-running?
   "Queries wether a process is running."

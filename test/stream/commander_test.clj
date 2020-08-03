@@ -211,14 +211,13 @@
           (is (= :timeout @prom1))))
 
       (testing "stopping the process"
-        (let [prom (api/wait-for!
-                    proc
-                    :matcher #(or (= (:event %1) :inactive)
-                                 (= (:event %1) :failed)))]
-          (api/start-process! proc)
-          (api/stop-process! proc)
+        @(api/start-process! proc)
+        (let [prom (api/stop-process! proc)]
           (is (not (= :timeout @prom)))
           (is (not (api/process-running? proc)))))
+
+      (testing "re starting a process"
+        (is (not (= :timeout (:event @(api/restart-process! proc))))))
 
       (testing "enabling the process"
         (api/enable-process! proc)

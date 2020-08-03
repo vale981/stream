@@ -35,6 +35,8 @@
    :audio-bitrate "128k" :audio-channels 1 :audio-sampling-rate 44100
    :rtsp-user nil :rtsp-password nil :buffer-size "100M"})
 
+(def ^:const +default-timeout+ 1000)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                         ;              Utilities              ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -196,7 +198,7 @@
   takes precedence.
   "
   [supervisor & {:keys [event timeout matcher]
-                 :or {timeout 1000}}]
+                 :or {timeout +default-timeout+}}]
   (let [prom (promise)]
     (if (and (not event) (not matcher))
       (throw+ {:type ::commander-error
@@ -307,39 +309,42 @@
 
 (defn get-process-state!
   "Queries wether a process is running."
-  [process]
-  (with-process process proc
-    (sys/get-service-state! (:unit-name proc))))
+  [proc]
+  (sys/get-service-state! (:unit-name proc)))
 
 (defn start-process!
-  "Starts the service associated to the process."
-  [process]
-  (with-process process proc
-    (sys/start-service! (:unit-name proc))))
+  "Starts the service associated to the process `proc` (either id or
+  process object). Returns a promise that resolves to event `:failed`
+  or `:active` or times out after `timeout` ms."
+  ([proc timeout]
+   (let [prom
+         (wait-for! (:supervisor proc)
+                    :matcher #(some #{(:event %1)} [:active :failed]))]
+     (sys/start-service! (:unit-name proc))
+     prom))
+  ([proc]
+   (start-process! process +default-timeout+)))
 
 (defn stop-process!
   "Stops the service associated to the process."
-  [process]
-  (with-process process proc
-    (sys/stop-service! (:unit-name proc))))
+  [proc]
+  (sys/stop-service! (:unit-name proc)))
 
 (defn process-running?
   "Queries wether a process is running."
-  [process]
-  (= (get-process-state! process) "active"))
+  [proc]
+  (= (get-process-state! proc) "active"))
 
 (defn enable-process!
   "Enables a process."
-  [process]
-  (with-process process proc
-    (sys/enable-service! (:unit-name proc))))
+  [proc]
+  (sys/enable-service! (:unit-name proc)))
 
 (defn process-enabled?
   "Enables a process."
-  [process]
-  (with-process process proc
-    (= (sys/get-service-file-state! (:unit-name proc))
-       :enabled)))
+  [proc]
+  (= (sys/get-service-file-state! (:unit-name proc))
+     :enabled))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                         ;                 Init                ;

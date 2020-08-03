@@ -166,9 +166,7 @@
         (is :loaded (api/get-process-state! proc)))
 
       (testing "starting a process"
-        (is true (api/start-process! proc))
-        ;; now: the process ought to be **failed**
-        (is :failed (api/get-process-state! proc)))
+        (is (not (= :timeout (:event @(api/start-process! proc))))))
 
       (testing "waiting for the process to start"
         (let  [prom (api/wait-for!

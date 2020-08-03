@@ -147,6 +147,7 @@
     (is (= "a-b-c-d-" (#'api/sanitize-process-name "a*b C?d.")))))
 
 (deftest ffmpeg-process-management
+  ;; NOTE: This creates a failing process.
   (let [config {:cam-ip "0.0.0.0"
                 :cam-rtsp-port "554"
                 :profile "bla"
@@ -239,6 +240,11 @@
       (api/create-process!
        "tester" config)
       (is (= 2 (count @@#'api/processes))))
+
+    (testing "replace process"
+      (let [proc (api/create-process! "ghost" config)
+            proc-new (api/create-process! "ghost" config (:id proc))]
+        (is (not (= proc proc-new)))))
 
     (testing "generated ids do not collide"
       (doseq [i (range 100)]

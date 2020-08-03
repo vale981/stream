@@ -251,26 +251,6 @@
 (defn- sanitize-process-name [name]
   (string/lower-case (string/replace name #"\W" "-")))
 
-(defn create-process!
-  "Creates a process, adds it to the registry and assigns a monitoring
-  channel to it. Returns the process."
-  [process-name ffmpeg-config]
-  (let [id (generate-process-id)
-        ffmpeg-config (merge default-ffmpeg-config ffmpeg-config)
-        unit-name (str (sanitize-process-name process-name)
-                       "-" id)
-        path (sys/create-service! unit-name
-                                  (ffmpeg-command ffmpeg-config)
-                                  (get ffmpeg-config :description
-                                       "FFMPEG streaming process, created by `stream`."))
-        monitor (sys/create-monitor! unit-name)
-        supervisor (attach-supervisor! id (first monitor))
-        process (->process id process-name unit-name monitor supervisor ffmpeg-config #{})]
-    (info "Creating process with ID:" id)
-    (dosync
-     (commute processes assoc id process))
-    process))
-
 (defn get-process!
   "Get the process with the id."
   [id]
@@ -289,6 +269,34 @@
     (dosync (commute processes dissoc (:id proc)))
     true))
 
+(defn create-process!
+  "Creates a process with the name `process-name` and the
+  `ffmpeg-config`, adds it to the registry and assigns a monitoring
+  channel to it. An `id` is generated if not specified. When the
+  specified `id` is already present in the registry it is replaced.
+
+  Returns the process."
+  ([process-name ffmpeg-config id]
+   (if-let [proc (get-process! id)]
+       (do (info "Replacing process with ID:" id)
+           (delete-process! proc))
+       (info "Creating process with ID:" id))
+   (let [ffmpeg-config (merge default-ffmpeg-config ffmpeg-config)
+         unit-name (str (sanitize-process-name process-name)
+                        "-" id)
+         path (sys/create-service! unit-name
+                                   (ffmpeg-command ffmpeg-config)
+                                   (get ffmpeg-config :description
+                                        "FFMPEG streaming process, created by `stream`."))
+         monitor (sys/create-monitor! unit-name)
+         supervisor (attach-supervisor! id (first monitor))
+         process (->process id process-name unit-name monitor supervisor ffmpeg-config #{})]
+     (dosync
+      (commute processes assoc id process))
+     process))
+  ([process-name ffmpeg-config]
+   (create-process! process-name ffmpeg-config (generate-process-id))))
+
 (defn delete-all-processes! []
   "Deletes all processes."
   (doseq [[_ proc] @processes]
@@ -298,6 +306,9 @@
   "Queries wether a process is running."
   [proc]
   (sys/get-service-state! (:unit-name proc)))
+
+;; These control functions do not wait until a "final state" is
+;; reached but resolve once a new, maybe unstable, state has been reached.
 
 (defn start-process!
   "Starts the service associated to the process `proc`. Returns a

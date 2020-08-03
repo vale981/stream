@@ -170,14 +170,14 @@
 
       (testing "waiting for the process to start"
         (let  [prom (api/wait-for!
-                     (:supervisor proc)
+                     proc
                      :event :active :timeout 10000)]
           (api/start-process! proc)
           (is (not (= :timeout @prom)))))
 
       (testing "waiting for the process to fail"
         (let  [prom (api/wait-for!
-                     (:supervisor proc)
+                     proc
                      :event :failed
                      :timeout 100000)]
           (api/start-process! proc)
@@ -185,7 +185,7 @@
 
       (testing "waiting for the process to activate or fail"
         (let  [prom (api/wait-for!
-                     (:supervisor proc)
+                     proc
                      :matcher #(or (= (:event %1) :active)
                                   (= (:event %1) :failed))
                      :timeout 1000)]
@@ -200,25 +200,19 @@
 
       (testing "waiting for a timeout"
         (let  [prom (api/wait-for!
-                     (:supervisor proc)
+                     proc
                      :event :one
                      :timeout 100)
                prom1 (api/wait-for!
-                      (:supervisor proc)
+                      proc
                       :matcher #(and % false)
                       :timeout 100)]
           (is (= :timeout @prom))
           (is (= :timeout @prom1))))
 
-      (testing "the with-process macro"
-        (api/with-process (:id proc) new-proc
-          (is (= proc new-proc)))
-        (is (not (api/with-process "none" new-proc
-                 true))))
-
       (testing "stopping the process"
         (let [prom (api/wait-for!
-                    (:supervisor proc)
+                    proc
                     :matcher #(or (= (:event %1) :inactive)
                                  (= (:event %1) :failed)))]
           (api/start-process! proc)
@@ -237,7 +231,7 @@
           (is (= (:id proc) (:id (a/<!! c))))))
 
       (testing "deleting the process"
-        (is (api/delete-process! (:id proc)))
+        (is (api/delete-process! proc))
         (is (not (api/get-process! (:id proc))))))
 
     (testing "creating two processes"
@@ -253,7 +247,4 @@
 
     (testing "deleting all processes"
       (api/delete-all-processes!)
-      (is (= 0 (count @@#'api/processes))))
-
-    (testing "deleting non-existent process"
-      (is (not (api/delete-process! "nonexistent"))))))
+      (is (= 0 (count @@#'api/processes))))))

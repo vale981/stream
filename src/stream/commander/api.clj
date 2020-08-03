@@ -197,9 +197,10 @@
   Either `:event` or `:matcher` or both have to be given. `:event`
   takes precedence.
   "
-  [supervisor & {:keys [event timeout matcher]
+  [process & {:keys [event timeout matcher]
                  :or {timeout +default-timeout+}}]
-  (let [prom (promise)]
+  (let [prom (promise)
+        supervisor (:supervisor process)]
     (if (and (not event) (not matcher))
       (throw+ {:type ::commander-error
                :detail-type ::create-watch-error
@@ -269,43 +270,23 @@
   [id]
   (get @processes id))
 
-;; TODO: defmulti
-(defmacro with-process
-  "A wrapper to access a process either by id or by the process itself.
-  `proc` can either be a process or a process-id. The process is bound
-  to `proc-var`.
-
-  Returns `false` if no process is found."
-  [proc proc-var & body]
-  `(if-let [~proc-var
-            (cond
-              (string? ~proc)
-              (get-process! ~proc)
-
-              (instance? process ~proc)
-              ~proc
-              :default ~proc)]
-     (do ~@body)
-     false))
-
 (defn delete-process!
   "Deletes a process from the process map, stops it and deletes the unit file.
   Returns `true` on success, `false` otherwise."
-  [process]
-  (with-process process proc
-    (debug "Removing process with ID:" (:id proc))
-    (let [{:keys [unit-name monitor]} proc
+  [proc]
+  (debug "Removing process with ID:" (:id proc))
+  (let [{:keys [unit-name monitor]} proc
           [monitor close] monitor]
-      (close! (:supervisor proc))
-      (sys/remove-service! unit-name)
-      (close)
-      (dosync (commute processes dissoc (:id proc)))
-      true)))
+    (close! (:supervisor proc))
+    (sys/remove-service! unit-name)
+    (close)
+    (dosync (commute processes dissoc (:id proc)))
+    true))
 
 (defn delete-all-processes! []
   "Deletes all processes."
-  (doseq [[id _] @processes]
-    (delete-process! id)))
+  (doseq [[_ proc] @processes]
+    (delete-process! proc)))
 
 (defn get-process-state!
   "Queries wether a process is running."
@@ -318,12 +299,11 @@
   or `:active` or times out after `timeout` ms."
   ([proc timeout]
    (let [prom
-         (wait-for! (:supervisor proc)
-                    :matcher #(some #{(:event %1)} [:active :failed]))]
+         (wait-for! proc :matcher #(some #{(:event %1)} [:active :failed]))]
      (sys/start-service! (:unit-name proc))
      prom))
   ([proc]
-   (start-process! process +default-timeout+)))
+   (start-process! proc +default-timeout+)))
 
 (defn stop-process!
   "Stops the service associated to the process."

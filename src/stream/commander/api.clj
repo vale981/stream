@@ -276,7 +276,7 @@
   [proc]
   (debug "Removing process with ID:" (:id proc))
   (let [{:keys [unit-name monitor]} proc
-          [monitor close] monitor]
+        [monitor close] monitor]
     (close! (:supervisor proc))
     (sys/remove-service! unit-name)
     (close)

@@ -28,6 +28,16 @@
 (defrecord process
     [id process-name unit-name monitor supervisor ffmpeg-config problems])
 
+(defn process=
+  "Tests `proc-1` and `proc-2` for equality."
+  [proc-1 proc-2]
+  (loop [[key & keys] [:id :process-name :config]]
+    (if key
+      (if (= (get proc-1 key) (get proc-2 key))
+        (recur keys)
+        false)
+      true)))
+
 (def ^:private processes (ref {}))
 (def ^:private dbus-monitor (chan))
 (def ^:private master-monitor (chan))
@@ -272,7 +282,7 @@
   "Deletes a process from the process map, stops it and deletes the unit file.
   Returns `true` on success, `false` otherwise."
   [proc]
-  (debug "Removing process with ID:" (:id proc))
+  (info "Removing process with ID:" (:process-name proc))
   (let [{:keys [unit-name monitor]} proc
         [monitor close] monitor]
     (close! (:supervisor proc))
@@ -294,7 +304,7 @@
    (if-let [proc (get-process! id)]
      (do (info "Replacing process with ID:" id)
          (delete-process! proc))
-     (info "Creating process with ID:" id))
+     (info "Creating process " process-name))
    (let [ffmpeg-config (merge default-ffmpeg-config ffmpeg-config)
          unit-name (str (sanitize-process-name process-name)
                         "-" id)
@@ -307,8 +317,7 @@
          process (->process id process-name unit-name monitor supervisor ffmpeg-config #{})]
      (dosync
       (commute processes assoc id process))
-     (go
-       (save-process! process))
+     (save-process! process)
      process))
   ([process-name ffmpeg-config]
    (create-process! process-name ffmpeg-config (generate-process-id))))
@@ -387,9 +396,10 @@
             :version 1}))
 
 (defn edn->process!
-  "Creates a process from its edn serialized version."
-  [{:keys [name config id]}]
-  (create-process! name config id))
+  "Creates a process from its `edn` serialized version."
+  [edn]
+  (let [{:keys [name config id]} (clojure.edn/read-string edn)]
+    (create-process! name config id)))
 
 (defn processdb-filename
   "Computes the filename of the serialization file for the given process
@@ -418,23 +428,18 @@
      true
      (catch Object _
        (error (:throwable &throw-context) "could not write process file")
-       false))))
+       (throw+)))))
 
 ;; TODO: Global warnings
 (defn load-process!
   "Loads a process with the `id` from the processdb directory.
-  Returns `false` if the db file is not found or can't be read and
+  Returns `nil` if the db file is not found or can't be read and
   the loaded process otherwise."
   [id]
   (if-let [proc-data
-           (try+
-            (clojure.edn/read-string
-             (slurp (processdb-filename id)))
-            (catch Object _
-              (error (:throwable &throw-context) "could not read process file")
-              false))]
+           (slurp (processdb-filename id))]
     (edn->process! proc-data)
-    false))
+    nil))
 
 (defn load-processes!
   "Loads the serialized processes from the processdb directory by
@@ -442,30 +447,17 @@
   []
   (reduce (fn [procs file]
             (if-let [id (second (re-matches #"(.*)\.edn" file))]
-              (if-let [proc (load-process! id)]
-                (conj procs proc)
-                )
+              (try+ (conj procs (load-process! id))
+                    (catch Object _
+                      procs))
               procs))
           [] (.list (File. processdb-directory))))
-
-
-(defn save-processes!
-  "Saves the process registry to files via [[save-process!]]"
-  []
-  (info "saving processes")
-  (doseq [[_ proc] @processes]
-    (save-process! proc)))
 
 (defn delete-processdb-file!
   "Deletes the processdb file of a process.
   Returns `false` if the file is not found."
   [id]
-  (try+
-   (io/delete-file (processdb-filename id))
-   true
-   (catch Object _
-     (error (:throwable &throw-context) "could not delete process file")
-     false)))
+  (io/delete-file (processdb-filename id)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                         ;                 Init                ;

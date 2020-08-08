@@ -1,0 +1,3 @@
+{
+ stream.commander.api/processdb-directory "./resources/test/processes"
+}

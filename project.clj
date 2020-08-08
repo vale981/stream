@@ -14,7 +14,8 @@
                  [com.taoensso/encore "2.122.0"]
                  [com.outpace/config "0.13.2"]]
   :main ^:skip-aot stream.core
-  :aliases {"config" ["run" "-m" "outpace.config.generate"]}
+  :aliases {"config" ["run" "-m" "outpace.config.generate"]
+            "coverage" ["with-profile" "test" "cloverage"]}
   :profiles {:test {:jvm-opts ["-Dconfig.edn=resources/test/config.edn"]}
              :prod {:jvm-opts ["-Dconfig.edn=config.edn"]}
              :uberjar {:aot :all}}

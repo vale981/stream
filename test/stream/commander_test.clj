@@ -170,26 +170,26 @@
         (is (not (= :timeout (:event @(api/start-process! proc))))))
 
       (testing "waiting for the process to start"
-        (let  [prom (api/wait-for!
-                     proc
-                     :event :active :timeout 10000)]
+        (let [prom (api/wait-for!
+                    proc
+                    :event :active :timeout 10000)]
           (api/start-process! proc)
           (is (not (= :timeout @prom)))))
 
       (testing "waiting for the process to fail"
-        (let  [prom (api/wait-for!
-                     proc
-                     :event :failed
-                     :timeout 100000)]
+        (let [prom (api/wait-for!
+                    proc
+                    :event :failed
+                    :timeout 100000)]
           (api/start-process! proc)
           (is (not (= :timeout @prom)))))
 
       (testing "waiting for the process to activate or fail"
-        (let  [prom (api/wait-for!
-                     proc
-                     :matcher #(or (= (:event %1) :active)
-                                  (= (:event %1) :failed))
-                     :timeout 1000)]
+        (let [prom (api/wait-for!
+                    proc
+                    :matcher #(or (= (:event %1) :active)
+                                 (= (:event %1) :failed))
+                    :timeout 1000)]
           (api/start-process! proc)
           (is (not (= :timeout @prom)))))
 
@@ -200,14 +200,14 @@
         (a/>!! (first (:monitor proc)) "junk"))
 
       (testing "waiting for a timeout"
-        (let  [prom (api/wait-for!
+        (let [prom (api/wait-for!
+                    proc
+                    :event :one
+                    :timeout 100)
+              prom1 (api/wait-for!
                      proc
-                     :event :one
-                     :timeout 100)
-               prom1 (api/wait-for!
-                      proc
-                      :matcher #(and % false)
-                      :timeout 100)]
+                     :matcher #(and % false)
+                     :timeout 100)]
           (is (= :timeout @prom))
           (is (= :timeout @prom1))))
 
@@ -252,4 +252,55 @@
 
     (testing "deleting all processes"
       (api/delete-all-processes!)
-      (is (= 0 (count @@#'api/processes))))))
+      (is (= 0 (count @@#'api/processes))))
+
+    (testing "serialize and load process"
+      (let [proc (api/create-process! "test" config)
+            id (:id proc)
+            saved (api/save-process! proc)
+            loaded (api/load-process! id)
+            edn (api/process->edn proc)
+            fromedn (api/edn->process! edn)]
+        (is (api/process= proc fromedn))
+        (is saved)
+        (is (api/process= proc loaded))
+        (api/delete-all-processes!)))
+
+    (testing "saving a process twice"
+      (let [proc (api/create-process! "test" config)]
+        (api/save-process! proc)
+        (api/save-process! proc)
+        (api/delete-all-processes!)))
+
+    (testing "loading a nonexistent process"
+      (try+
+       (api/load-process! "nonone")
+       (is false)
+       (catch Object _
+         (is true))))
+
+    (testing "deleting a nonexistent process"
+      (try+
+       (api/delete-processdb-file! "nonone")
+       (is false)
+       (catch Object _
+         (is true))))
+
+    (testing "automatic saving and loading"
+      (let [procs [(api/create-process!
+                    "tester" config)
+                   (api/create-process!
+                    "tester2" config)]]
+        ;; lets put in a random broken edn file-seq
+        (spit (api/processdb-filename "distract") "bla")
+        (let [loaded (api/load-processes!)]
+          (is (= (count loaded) 2))
+          (is (reduce (fn [same proc]
+                        (if same
+                          (some #(api/process= proc %) procs)
+                          false)) true
+                      (api/load-processes!)))))
+      (is (= 2 (count @@#'api/processes)))
+      (api/delete-all-processes!)
+      (clojure.java.io/delete-file (api/processdb-filename "distract"))
+      (is (= "" (reduce str (.list (clojure.java.io/file api/processdb-directory))))))))

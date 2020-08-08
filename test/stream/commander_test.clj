@@ -147,6 +147,7 @@
     (is (= "a-b-c-d-" (#'api/sanitize-process-name "a*b C?d.")))))
 
 (deftest ffmpeg-process-management
+  (.mkdirs (.getParentFile (clojure.java.io/file api/processdb-directory)))
   ;; NOTE: This creates a failing process.
   (let [config {:cam-ip "0.0.0.0"
                 :cam-rtsp-port "554"

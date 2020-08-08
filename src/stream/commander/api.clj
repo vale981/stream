@@ -427,8 +427,10 @@
                              [(StandardCopyOption/REPLACE_EXISTING)]))
      true
      (catch Object _
-       (error (:throwable &throw-context) "could not write process file")
-       (throw+)))))
+       (error  "could not write process file for " (:process-name proc))
+       (throw+ {:type ::commander-error
+                :detail-type :saving-failed
+                :error (:throwable &throw-context)})))))
 
 ;; TODO: Global warnings
 (defn load-process!
@@ -437,10 +439,17 @@
   the loaded process otherwise."
   [id]
   (if-let [proc-data
-           (slurp (processdb-filename id))]
+           (try+
+            (slurp (processdb-filename id))
+            (catch Object _
+              (error "could not load process file " (processdb-filename id))
+              (throw+ {:type ::commander-error
+                       :detail-type :loading-failed
+                       :error (:throwable &throw-context)})))]
     (edn->process! proc-data)
     nil))
 
+;; TODO: notify of failed ones
 (defn load-processes!
   "Loads the serialized processes from the processdb directory by
   iterating over it. Returns an array of processes."
@@ -457,7 +466,13 @@
   "Deletes the processdb file of a process.
   Returns `false` if the file is not found."
   [id]
-  (io/delete-file (processdb-filename id)))
+  (try+
+   (io/delete-file (processdb-filename id))
+   (catch Object _
+     (error "could not delete process file " (processdb-filename id))
+     (throw+ {:type ::commander-error
+              :detail-type :deleting-failed
+              :error (:throwable &throw-context)}))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                         ;                 Init                ;

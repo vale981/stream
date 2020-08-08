@@ -276,14 +276,16 @@
       (try+
        (api/load-process! "nonone")
        (is false)
-       (catch Object _
+       (catch [:type :stream.commander.api/commander-error
+               :detail-type :loading-failed] _
          (is true))))
 
     (testing "deleting a nonexistent process"
       (try+
        (api/delete-processdb-file! "nonone")
        (is false)
-       (catch Object _
+       (catch [:type :stream.commander.api/commander-error
+               :detail-type :deleting-failed] _
          (is true))))
 
     (testing "automatic saving and loading"

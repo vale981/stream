@@ -78,6 +78,42 @@
         id))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                                        ;            Error Diagnose           ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn diagnose-error
+  "Deduces the problem from the error `message` and the process
+  information `proc` and returns it.
+
+  The returned codes are:
+    `:source` The streaming source can't be reached.
+    `:remote` The streaming remote can't be reached.
+    `:os` Launching the process failed at the os level.
+          Executable not found or something else.
+          Most likely not recoverable.
+    `:user` The user killed the process. This ain't an error.
+    `:unknown` The catchall."
+  [message proc]
+  (cond
+    (string/includes? message (:cam-ip (:ffmpeg-config proc)))
+    :source
+
+    (or (re-find #"Operation not permitted" message)
+       (re-find #"Input/output" message)
+       (string/includes? message (:stream-server (:ffmpeg-config proc))))
+    :remote
+
+    (or (re-find #"spawn" message)
+       (re-find #"niceness" message))
+    :os
+
+    (or (re-find #"SIGINT" message)
+       (re-find #"SIGKILL" message))
+    :user
+
+    :else :unknown))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                         ;              Monitoring             ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

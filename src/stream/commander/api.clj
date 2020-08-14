@@ -90,7 +90,7 @@
                                         ;            Error Diagnose           ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn diagnose-error
+(defn diagnose-runtime-error
   "Deduces the problem from the error `message` and the process
   information `proc` and returns it.
 
@@ -122,9 +122,36 @@
 
     :else :unknown))
 
+(defn diagnose-start-error
+  "Deduces the problem from the error `message` and the process
+  information `proc` and returns it.
+
+  The returned codes are:
+    "
+  [message _]
+  (cond
+    (string/includes? message "No such file") :ffmpeg-not-found
+    :else :unknown))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                         ;              Monitoring             ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- handle-process-error!
+  [event id]
+  (when-let [proc (get-process! id)]
+    (let [problem
+          (case (:detail-type event)
+            :nonzero-exit (diagnose-runtime-error (:stderr (:details event)) proc)
+            :start-failed (diagnose-start-error (:message (:details event)) proc)
+            nil)]
+
+      (dosync
+       (alter processes
+              (fn [procs]
+                (let [proc (get procs id)
+                      updated-proc (assoc proc :problems (conj (:problems proc) problem))]
+                  (assoc procs id updated-proc))))))))
 
 (defn- put-process-event!
   [id data]
@@ -135,12 +162,8 @@
 (defn- handle-status-event!
   "Handles status `event`s from the process with the `id`."
   [id event]
-  (println "------------------------------>" event
-           (case (:type event)
-             :error (when (= :nonzero-exit (:detail-type :nonzero-exit))
-                      (when-let [proc (get-process! id)]
-                        (diagnose-error (:stderr (:details event)) proc)))
-             :else nil))
+  (case (:type event)
+    :error (handle-process-error! event id))
   (put-process-event! id event))
 
 ;; TODO: specs

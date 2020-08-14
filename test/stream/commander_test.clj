@@ -27,6 +27,7 @@
   (let [config {:cam-ip "0.0.0.0"
                 :cam-rtsp-port "554"
                 :profile "bla"
+                :ffmpeg-path "nonex"
                 :stream-server "server"
                 :stream-key "key"}]
     ;; TODO: proper spec testing
@@ -40,6 +41,10 @@
 
       (testing "starting a process (which will fail)"
         (is (not (:success @(p/start! proc)))))
+
+      (testing "problem diagnosis"
+        (is ((:problems (api/get-process! (:id proc)))
+             :ffmpeg-not-found)))
 
       (testing "spilling junk into the monitor channel"
         (a/>!! (:monitor proc) "junk"))

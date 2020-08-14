@@ -119,7 +119,7 @@
         (do
           (a/put! status (error-status err
                                        :start-failed
-                                       :stderr err))
+                                       :message err))
           (deliver prom {:success false :error err})
           nil)))))
 

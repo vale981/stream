@@ -36,6 +36,9 @@
           (is (= :error (:type err)))
           (is (= 11 (-> err :details :code))))))
 
+    (testing "spilling junk into the control channel"
+      (>!! control "junk"))
+
     (testing "destroying the monitor"
       (is @(stop-monitor! control))
       (is (not (>!! status 0)))

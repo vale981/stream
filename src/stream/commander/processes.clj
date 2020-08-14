@@ -32,13 +32,15 @@
    :detail-type detail-type
    :details details})
 
-(def ^:const started-message {:type :event
-                              :event :started})
+(def ^:const started-message
+  {:type :event
+   :event :started})
 
 (defn- stopped-message
   [event stderr]
   {:type :event
-   :event :stopped :code event :stderr
+   :event :stopped
+   :code event :stderr
    (loop [lines []]
      (if-let [line (<!! stderr)]
        (recur (cons line lines))
@@ -115,7 +117,9 @@
             {:proc process :exit-chan exit-chan
              :stderr (make-stderr-channel! process stderr-buffer-size)})
         (do
-          (a/put! status (error-status err :start-failed))
+          (a/put! status (error-status err
+                                       :start-failed
+                                       :stderr err))
           (deliver prom {:success false :error err})
           nil)))))
 
@@ -168,6 +172,7 @@
      (error-status
       (str "Nonzero exit code! (" code ")")
       :nonzero-exit
+      :stderr stderr
       :code code))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -217,7 +222,10 @@
               :stop-monitor (handle-stop-monitor! status control prom)
 
               ;; default -> ignore
-              (recur state)))
+              (do
+                (when prom
+                  (resolve prom :not-implemented))
+                (recur state))))
 
           exit-chan
           (do
@@ -250,6 +258,9 @@
  start! "Starts the process through the control channel." :start)
 
 (encapsulate-command
+ restart! "Restarts the process through the control channel." :restart)
+
+(encapsulate-command
  stop! "Stops the process through the control channel." :stop)
 
 (encapsulate-command
@@ -270,6 +281,7 @@
 
   For the `options` see [[monitor-and-control-proc!]]."
   [command & options]
+  (println command)
   (let [status (chan)
         control (chan)]
     (let [command-list (into-array String command)

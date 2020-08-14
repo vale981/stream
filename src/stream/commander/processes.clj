@@ -26,20 +26,23 @@
 ;; TODO: do that with specs
 
 (defn- error-status
-  ([message details]
-   {:type :error
-    :message message
-    :details details}))
+  [message detail-type & {:as details}]
+  {:type :error
+   :message message
+   :detail-type detail-type
+   :details details})
 
-(def ^:const started-message {:event :started})
+(def ^:const started-message {:type :event
+                              :event :started})
 
 (defn- stopped-message
   [event stderr]
-  {:event :stopped :code event :stderr
-    (loop [lines []]
-      (if-let [line (<!! stderr)]
-        (recur (cons line lines))
-        lines))})
+  {:type :event
+   :event :stopped :code event :stderr
+   (loop [lines []]
+     (if-let [line (<!! stderr)]
+       (recur (cons line lines))
+       lines))})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                         ;      Process Interface Helpers      ;
@@ -112,6 +115,7 @@
             {:proc process :exit-chan exit-chan
              :stderr (make-stderr-channel! process stderr-buffer-size)})
         (do
+          (a/put! status (error-status err :start-failed))
           (deliver prom {:success false :error err})
           nil)))))
 
@@ -133,10 +137,17 @@
 
 (defn- handle-wait-for
   "Handles the `:wait-for` command."
-  [proc prom]
+  [proc dead-proc prom]
   (thread
-    (debug "WAIIIIIITING")
-    (deliver prom (.waitFor proc))))
+    (deliver
+     prom
+     (if proc
+       (.waitFor proc)
+       (if dead-proc
+         (try (.exitValue dead-proc)
+              (catch java.lang.IllegalStateException _
+                false))
+         false)))))
 
 (defn- handle-stop-monitor!
   "Handles the `:stop-monitor` command."
@@ -147,10 +158,17 @@
 
 (defn- handle-process-exit!
   "Handles the process exit."
-  [status event stderr]
+  [status code stderr]
   (a/put!
    status
-   (stopped-message event stderr)))
+   (stopped-message code stderr))
+  (when (not (= code 0))
+    (a/put!
+     status
+     (error-status
+      (str "Nonzero exit code! (" code ")")
+      :nonzero-exit
+      :code code))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                         ;     Main Process Monitor Thread     ;
@@ -171,7 +189,7 @@
       :as options}]
   (thread
     (debug "Starting monitoring of" (.command builder))
-    (loop [{:keys [proc exit-chan stderr] :as state} nil]
+    (loop [{:keys [proc exit-chan stderr dead-proc] :as state} nil]
       (let [chans (if exit-chan [control exit-chan] [control])
             [event c] (alts!! chans)]
         (trace "Event" event)
@@ -179,10 +197,13 @@
           control
           (let [{:keys [command prom]} event]
             (condp = command
-              :stop (recur (handle-stop! proc prom))
+              :stop (do (handle-stop! proc prom)
+                        (recur state))
+
               :start (recur (handle-start!
                              state status prom builder
                              {:stderr-buffer-size stderr-buffer-size}))
+
               :restart (recur (handle-restart!
                                state status prom builder
                                {:stderr-buffer-size stderr-buffer-size}))
@@ -190,8 +211,8 @@
               :alive? (do (handle-alive proc prom)
                           (recur state))
 
-              :wait-for (do (handle-wait-for proc prom)
-                          (recur state))
+              :wait-for (do (handle-wait-for proc dead-proc prom)
+                            (recur state))
 
               :stop-monitor (handle-stop-monitor! status control prom)
 
@@ -202,16 +223,28 @@
           (do
             (debug "Process" (.command builder) "stopped with exit code" event)
             (handle-process-exit! status event stderr)
-            (recur nil)))))))
+            (recur {:dead-proc proc})))))))
+
+
+(defprotocol ControllableProcess
+  "A structure that contains a control channel for a process."
+  (control [this] "Gives the control channel."))
 
 (defmacro encapsulate-command
   [name doc command]
   `(defn ~name
      ~doc
-     [control#]
-     (let [prom# (promise)]
+     [proc#]
+     (let [prom# (promise)
+           control# (if (satisfies? ControllableProcess proc#)
+                      (control proc#)
+                      proc#)]
        (a/put! control# {:command ~command :prom prom#})
        prom#)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                                        ;           Public Interface          ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (encapsulate-command
  start! "Starts the process through the control channel." :start)
@@ -223,15 +256,11 @@
  alive? "Checks if the process is alive through the control channel." :alive?)
 
 (encapsulate-command wait-for "Returns a promise that is resolved to
- the process' exit value once it is finished. Takes the control
- channel as argument." :wait-for)
+ the process' exit value once it is finished or to false if there
+ is/was no process running." :wait-for)
 
 (encapsulate-command
  stop-monitor! "Stops the process monitoring control channel." :stop-monitor)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-                                        ;           Public Interface          ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn launch!
   "Creates a process from the `command` (command and arguments as
@@ -254,7 +283,7 @@
                                         ;               Snippets              ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(do
+(comment
   (def p (launch! ["ffmpeg"] :stderr-buffer-size 1))
   (def c (second p))
   (def s (first p))

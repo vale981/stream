@@ -11,22 +11,30 @@
 (deftest invalid-command
   (testing "creating a bogus command"
     (let [[status control] (launch! ["bogus"])]
-      (is (not (:success @(start! control)))))))
+      (is (not (:success @(start! control))))
+      (is (= :start-failed (:detail-type (<!! status)))))))
 
 (deftest basics
   (let [[status control]
         (launch! ["/bin/sh" "resources/test/test-executables/simple.sh" "11"]
                  :stderr-buffer-size 2)]
+    (testing "if waiting for a nont started process returns false"
+      (is (= false @(wait-for control))))
+
     (dotimes [round 3]                  ; for sanity
       (testing (str "starting the process #" round)
         (is (:success @(start! control)))
         (is (= :started (:event (<!! status))))
         (is (= 11 @(wait-for control)))
+        (is (= 11 @(wait-for control))) ; twice
         (let [stop-evt (<!! status)]
           (is (= :stopped (:event stop-evt)))
           (is (= "stderr" (-> stop-evt :stderr first)))
           (is (= 2 (-> stop-evt :stderr count)))
-          (is (= 11 (:code stop-evt))))))
+          (is (= 11 (:code stop-evt))))
+        (let [err (<!! status)]
+          (is (= :error (:type err)))
+          (is (= 11 (-> err :details :code))))))
 
     (testing "destroying the monitor"
       (is @(stop-monitor! control))

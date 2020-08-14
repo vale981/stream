@@ -42,10 +42,6 @@
       (testing "starting a process (which will fail)"
         (is (not (:success @(p/start! proc)))))
 
-      (testing "problem diagnosis"
-        (is ((:problems (api/get-process! (:id proc)))
-             :ffmpeg-not-found)))
-
       (testing "spilling junk into the monitor channel"
         (a/>!! (:monitor proc) "junk"))
 
@@ -61,7 +57,9 @@
         (let [c (a/chan)]
           (a/sub api/monitor :process-event c)
           (p/start! proc)
-          (is (= (:id proc) (:id (a/<!! c))))))
+          (is (= (:id proc) (:id (a/<!! c))))
+          (is ((:problems (api/get-process! (:id proc)))
+             :ffmpeg-not-found))))
 
       (testing "deleting the process"
         (is (api/delete-process! proc))

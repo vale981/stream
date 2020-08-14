@@ -137,6 +137,12 @@
                                         ;              Monitoring             ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defn- put-process-event!
+  [id data]
+  (a/put! master-monitor {:type :process-event
+                          :id id
+                          :event data}))
+
 (defn- handle-process-error!
   [event id]
   (when-let [proc (get-process! id)]
@@ -146,18 +152,15 @@
             :start-failed (diagnose-start-error (:message (:details event)) proc)
             nil)]
 
+      (put-process-event! id {:type :new-problem
+                              :problem problem})
+
       (dosync
        (alter processes
               (fn [procs]
                 (let [proc (get procs id)
                       updated-proc (assoc proc :problems (conj (:problems proc) problem))]
                   (assoc procs id updated-proc))))))))
-
-(defn- put-process-event!
-  [id data]
-  (a/put! master-monitor {:type :process-event
-                          :id id
-                          :event data}))
 
 (defn- handle-status-event!
   "Handles status `event`s from the process with the `id`."

@@ -135,10 +135,12 @@
 (defn- handle-status-event!
   "Handles status `event`s from the process with the `id`."
   [id event]
-  (case (:type event)
-    :error (when (= :nonzero-exit (:detail-type :nonzero-exit))
-             (when-let [proc (get-process! id)]
-               (diagnose-error (:stderr (:details event)) proc))))
+  (println "------------------------------>" event
+           (case (:type event)
+             :error (when (= :nonzero-exit (:detail-type :nonzero-exit))
+                      (when-let [proc (get-process! id)]
+                        (diagnose-error (:stderr (:details event)) proc)))
+             :else nil))
   (put-process-event! id event))
 
 ;; TODO: specs
